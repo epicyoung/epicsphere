@@ -1,98 +1,293 @@
 <!DOCTYPE html>
 <html>
-
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Epic Sphere - Seamless Transition</title>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #132039 0%, #1a457b 40%, #006093 100%);
+      overflow: hidden;
+      height: 100vh;
+    }
 
-  <title>A-Frame: Tap to Place Ground</title>
-  <meta itemprop="name" content="A-Frame: Tap to Place Ground">
-  <meta name="twitter:title" content="A-Frame: Tap to Place Ground">
-  <meta property="og:title" content="A-Frame: Tap to Place Ground">
-  <meta property="og:site_name" content="A-Frame: Tap to Place Ground">
-  <meta name="description" content="This example allows the user to grow cacti 🌵  by tapping or clicking the ground. Showcases raycasting, spawning objects, and importing a 3D model.">
-  <meta itemprop="description" content="This example allows the user to grow cacti 🌵  by tapping or clicking the ground. Showcases raycasting, spawning objects, and importing a 3D model.">
-  <meta property="og:description" content="This example allows the user to grow cacti 🌵  by tapping or clicking the ground. Showcases raycasting, spawning objects, and importing a 3D model.">
-  <meta name="twitter:description" content="This example allows the user to grow cacti 🌵  by tapping or clicking the ground. Showcases raycasting, spawning objects, and importing a 3D model.">
-  <meta property="og:image" content="https://8thwall.org/aframe-world-effects/assets/preview.gif"/>
+    #exit-btn {
+      display: none;
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 999;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-radius: 50px;
+      padding: 8px 20px;
+      font-size: 12px;
+      font-family: sans-serif;
+      letter-spacing: 2px;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: all 0.3s;
+    }
+    #exit-btn:hover {
+      background: rgba(255,255,255,0.2);
+      border-color: white;
+    }
 
-  <script crossorigin="anonymous" src="./external/scripts/8frame-1.5.0.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@8thwall/landing-page@1/dist/landing-page.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" crossorigin="anonymous" async="true" data-preload-chunks="slam"></script>
+    #hint {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.8);
+      font-family: sans-serif;
+      font-size: 13px;
+      letter-spacing: 1px;
+      pointer-events: none;
+      transition: opacity 0.5s;
+      text-align: center;
+      text-shadow: 0px 2px 4px rgba(0,0,0,0.5);
+    }
+
+    #flash {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: white;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+  </style>
 </head>
-
 <body>
-<script src="bundle.js"></script>
-<!-- Copyright (c) 2022 8th Wall, Inc. -->
-<!-- body.html is optional; elements will be added to your html body after app.js is loaded. -->
 
-<div class="over">
-  <span id="promptText">Tap To Place Model</span>
-</div>
+  <div id="flash"></div>
+  <div id="hint">CLICK SPHERE TO ENTER</div>
+  <button id="exit-btn">EXIT 360</button>
 
-<!-- Add the tap-place component to the scene so it has an effect -->
-<a-scene
-  tap-place
-  landing-page
-  xrextras-loading
-  xrextras-runtime-error
-  renderer="colorManagement:true"
-  xrweb="
-    allowedDevices: any;
-    defaultEnvironmentFogIntensity: 0.5; 
-    defaultEnvironmentFloorTexture: #groundTex; 
-    defaultEnvironmentFloorColor: #FFF;
-    defaultEnvironmentSkyBottomColor: #B4C4CC; 
-    defaultEnvironmentSkyTopColor: #5ac8fa;
-    defaultEnvironmentSkyGradientStrength: 0.5;">
+  <a-scene cursor="rayOrigin: mouse" raycaster="objects: .clickable" renderer="colorManagement: true;">
+    <a-assets timeout="10000">
+      <img id="tex" src="tex.jpg" crossorigin="anonymous">
+      <img id="grid-tex" src="data:image/svg+xml,%3Csvg width='512' height='512' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='256' cy='256' r='6' fill='%23ffffff'/%3E%3C/svg%3E" crossorigin="anonymous">
+    </a-assets>
 
-  <!-- We can define assets here to be loaded when A-Frame initializes -->
-  <a-assets>
-    <img id="groundTex" src="assets/sand.jpg">
-    <a-asset-item id="cactusModel" src="assets/cactus.glb"></a-asset-item>
-  </a-assets>
+    <!-- Camera Rig -->
+    <a-entity id="cam-rig" position="0 1 5">
+      <a-camera id="cam" position="0 0 0" look-controls wasd-controls="acceleration: 10"></a-camera>
+    </a-entity>
 
-  <!-- The raycaster will emit mouse events on scene objects specified with the cantap class -->
-  <a-camera
-    id="camera"
-    position="0 8 8"
-    raycaster="objects: .cantap"
-    cursor="
-      fuse: false;
-      rayOrigin: mouse;">
-  </a-camera>
+    <!-- Environment -->
+    <a-entity id="environment">
+      <a-light type="ambient" intensity="1.5" color="#ffffff"></a-light>
 
-  <a-entity
-    light="
-      type: directional;
-      intensity: 0.8;
-      castShadow: true;
-      shadowMapHeight:2048;
-      shadowMapWidth:2048;
-      shadowCameraTop: 40;
-      shadowCameraBottom: -40;
-      shadowCameraRight: 40;
-      shadowCameraLeft: -40;
-      target: #camera"
-    xrextras-attach="target: camera; offset: 8 15 4"
-    position="1 4.3 2.5"
-    shadow>
-  </a-entity>
+      <!-- Main Orb -->
+      <a-sphere
+        id="sphere"
+        class="clickable"
+        position="0 1.5 0"
+        radius="1"
+        segments-width="64"
+        segments-height="32"
+        material="src: #tex; color: #ffffff; roughness: 0.2; metalness: 0.3; opacity: 0.95; transparent: true; side: double;"
+        shadow="cast: true"
+        animation__rot="property: rotation; from: 0 0 0; to: 0 360 0; loop: true; dur: 15000; easing: linear"
+        animation__float="property: object3D.position.y; from: 1.3; to: 1.7; loop: true; dur: 2000; easing: easeInOutSine; dir: alternate">
+        <a-light type="point" intensity="1.5" distance="2.5" color="#ffffff" position="0 0 0"></a-light>
+      </a-sphere>
 
-  <a-light type="ambient" intensity="0.5"></a-light>
+      <!-- Reflection -->
+      <a-sphere
+        id="reflection"
+        position="0 -1.5 0"
+        radius="1"
+        segments-width="32"
+        segments-height="16"
+        material="src: #tex; color: #ffffff; opacity: 0.15; transparent: true; roughness: 0.1; metalness: 0.5; side: double;"
+        scale="1 -1 1"
+        animation__rot="property: rotation; from: 0 0 0; to: 0 360 0; loop: true; dur: 15000; easing: linear"
+        animation__float="property: object3D.position.y; from: -1.3; to: -1.7; loop: true; dur: 2000; easing: easeInOutSine; dir: alternate">
+      </a-sphere>
 
-  <!-- Adding the cantap class allows the ground to be clicked -->
-  <a-box
-    id="ground"
-    class="cantap"
-    scale="1000 2 1000"
-    position="0 -0.99 0"
-    material="shader: shadow; transparent: true; opacity: 0.4"
-    shadow>
-  </a-box>
-</a-scene>
+      <!-- Floor -->
+      <a-plane
+        id="floor"
+        position="0 0.005 0"
+        rotation="-90 0 0"
+        width="100"
+        height="100"
+        material="color: #0b1c3c; roughness: 0.4; opacity: 0.75; transparent: true;"
+        shadow="receive: true">
+      </a-plane>
+
+      <!-- Floor Grid (Titik-titik elegan) -->
+      <a-plane
+        id="floor-grid"
+        position="0 0.006 0"
+        rotation="-90 0 0"
+        width="100"
+        height="100"
+        material="src: #grid-tex; repeat: 200 200; transparent: true; opacity: 0.8; roughness: 1; shader: flat;">
+      </a-plane>
+    </a-entity>
+  </a-scene>
+
+  <script>
+    // Wait for scene to be fully ready before binding events
+    var scene = document.querySelector('a-scene');
+
+    function init() {
+      var sphere = document.getElementById('sphere');
+      var reflection = document.getElementById('reflection');
+      var floor = document.getElementById('floor');
+      var floorGrid = document.getElementById('floor-grid');
+      var camRig = document.getElementById('cam-rig');
+      var cam = document.getElementById('cam');
+      var exitBtn = document.getElementById('exit-btn');
+      var hint = document.getElementById('hint');
+      var flash = document.getElementById('flash');
+
+      var is360 = false;
+      var isTransitioning = false;
+      var lastClickTime = 0;
+
+      // --- RESET VIEW (Double Click Outside) ---
+      window.addEventListener('dblclick', function() {
+        // Cuma berlaku kalo lagi di luar dan nggak lagi transisi
+        if (is360 || isTransitioning) return;
+
+        // Matikan look-controls sementara biar bisa dianimasiin
+        cam.setAttribute('look-controls', 'enabled: false');
+        
+        // Animasi balik ke posisi dan rotasi awal
+        camRig.setAttribute('animation__resetpos', 'property: position; to: 0 1 5; dur: 800; easing: easeOutCubic');
+        cam.setAttribute('animation__resetcam', 'property: position; to: 0 0 0; dur: 800; easing: easeOutCubic');
+        cam.setAttribute('animation__resetrot', 'property: rotation; to: 0 0 0; dur: 800; easing: easeOutCubic');
+        
+        setTimeout(function() {
+          // Reset internal state look-controls biar nggak balik ke rotasi lama
+          var look = cam.components['look-controls'];
+          if (look) {
+            look.pitchObject.rotation.x = 0;
+            look.yawObject.rotation.y = 0;
+          }
+          cam.setAttribute('look-controls', 'enabled: true');
+        }, 850);
+      });
+
+      // --- ENTER / EXIT (Double Click on Orb) ---
+      sphere.addEventListener('click', function() {
+        var now = Date.now();
+        var timeSinceLastClick = now - lastClickTime;
+        lastClickTime = now;
+
+        // Kalo lagi di dalem 360, cek double click buat keluar
+        if (is360) {
+          if (timeSinceLastClick < 400 && !isTransitioning) {
+            exitBtn.click(); // Panggil fungsi exit
+          }
+          return;
+        }
+
+        // Kalo lagi di luar, single click buat masuk
+        if (isTransitioning) return;
+        isTransitioning = true;
+        hint.style.opacity = '0';
+
+        // Lock camera
+        cam.setAttribute('wasd-controls', 'enabled: false');
+
+        // Pause orb & reflection animations
+        sphere.removeAttribute('animation__float');
+        sphere.removeAttribute('animation__rot');
+        reflection.removeAttribute('animation__float');
+        reflection.removeAttribute('animation__rot');
+        reflection.setAttribute('visible', 'false');
+
+        // Get current orb Y position (it bobs up and down)
+        var orbY = sphere.object3D.position.y;
+
+        // Suck camera into orb center
+        camRig.setAttribute('animation__dive', 'property: position; to: 0 ' + orbY + ' 0; dur: 1200; easing: easeInOutCubic');
+
+        // Re-center local cam offset (WASD drift)
+        cam.setAttribute('animation__center', 'property: position; to: 0 0 0; dur: 1200; easing: easeInOutCubic');
+
+        // Expand orb to envelope camera
+        sphere.setAttribute('animation__expand', 'property: scale; to: 80 80 80; dur: 1200; easing: easeInOutCubic');
+
+        // Fade floor out
+        floor.setAttribute('animation__fade', 'property: material.opacity; to: 0; dur: 1000; easing: easeOutQuad');
+        floorGrid.setAttribute('animation__fade', 'property: material.opacity; to: 0; dur: 1000; easing: easeOutQuad');
+
+        // White flash at peak
+        setTimeout(function() { flash.style.opacity = '0.4'; }, 800);
+        setTimeout(function() { flash.style.opacity = '0'; }, 1100);
+
+        // Switch to flat shader (pure 360 viewer)
+        setTimeout(function() {
+          sphere.setAttribute('material', 'shader: flat; src: #tex; side: back;');
+          is360 = true;
+          isTransitioning = false;
+          exitBtn.style.display = 'block';
+        }, 1250);
+      });
+
+      // --- EXIT ---
+      exitBtn.addEventListener('click', function() {
+        if (!is360 || isTransitioning) return;
+        isTransitioning = true;
+        exitBtn.style.display = 'none';
+
+        // Restore material
+        sphere.setAttribute('material', 'src: #tex; color: #ffffff; roughness: 0.2; metalness: 0.3; opacity: 0.95; transparent: true; side: double;');
+
+        // Flash
+        flash.style.opacity = '0.3';
+        setTimeout(function() { flash.style.opacity = '0'; }, 300);
+
+        // Reset local cam
+        cam.setAttribute('position', '0 0 0');
+
+        // Fly camera back to spawn
+        camRig.setAttribute('animation__dive', 'property: position; to: 0 1 5; dur: 1000; easing: easeInOutCubic');
+
+        // Shrink orb back
+        sphere.setAttribute('animation__expand', 'property: scale; to: 1 1 1; dur: 1000; easing: easeInOutCubic');
+
+        // Fade floor in
+        floor.setAttribute('animation__fade', 'property: material.opacity; to: 0.75; dur: 1000; easing: easeInQuad');
+        floorGrid.setAttribute('animation__fade', 'property: material.opacity; to: 0.8; dur: 1000; easing: easeInQuad');
+
+        setTimeout(function() {
+          // Restore orb and reflection animations in perfect sync
+          sphere.setAttribute('animation__rot', 'property: rotation; from: 0 0 0; to: 0 360 0; loop: true; dur: 15000; easing: linear');
+          sphere.setAttribute('animation__float', 'property: object3D.position.y; from: 1.3; to: 1.7; loop: true; dur: 2000; easing: easeInOutSine; dir: alternate');
+          
+          reflection.setAttribute('animation__rot', 'property: rotation; from: 0 0 0; to: 0 360 0; loop: true; dur: 15000; easing: linear');
+          reflection.setAttribute('animation__float', 'property: object3D.position.y; from: -1.3; to: -1.7; loop: true; dur: 2000; easing: easeInOutSine; dir: alternate');
+          reflection.setAttribute('visible', 'true');
+
+          // Restore WASD
+          cam.setAttribute('wasd-controls', 'enabled: true');
+          hint.style.opacity = '1';
+
+          is360 = false;
+          isTransitioning = false;
+        }, 1050);
+      });
+    }
+
+    // Make sure A-Frame scene is loaded before binding
+    if (scene.hasLoaded) {
+      init();
+    } else {
+      scene.addEventListener('loaded', init);
+    }
+  </script>
 
 </body>
-
 </html>
