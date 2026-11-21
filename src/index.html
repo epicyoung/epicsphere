@@ -50,6 +50,7 @@
       transition: opacity 0.5s;
       text-align: center;
       text-shadow: 0px 2px 4px rgba(0,0,0,0.5);
+      z-index: 400;
     }
 
     #flash {
@@ -154,28 +155,41 @@
       var isTransitioning = false;
       var lastClickTime = 0;
 
-      // --- RESET VIEW (Double Click Outside) ---
-      window.addEventListener('dblclick', function() {
-        // Cuma berlaku kalo lagi di luar dan nggak lagi transisi
-        if (is360 || isTransitioning) return;
+      // A-Frame fullscreens only the canvas, which hides the HTML overlays and the body gradient.
+      // Fullscreen the whole page instead.
+      var canvas = scene.canvas;
+      canvas.requestFullscreen = canvas.webkitRequestFullscreen = function(options) {
+        var root = document.documentElement;
+        return (root.requestFullscreen || root.webkitRequestFullscreen).call(root, options);
+      };
 
-        // Matikan look-controls sementara biar bisa dianimasiin
+      function resetCamRotation(dur) {
+        // look-controls overrides rotation every tick, so disable it while animating
         cam.setAttribute('look-controls', 'enabled: false');
-        
-        // Animasi balik ke posisi dan rotasi awal
-        camRig.setAttribute('animation__resetpos', 'property: position; to: 0 1 5; dur: 800; easing: easeOutCubic');
-        cam.setAttribute('animation__resetcam', 'property: position; to: 0 0 0; dur: 800; easing: easeOutCubic');
-        cam.setAttribute('animation__resetrot', 'property: rotation; to: 0 0 0; dur: 800; easing: easeOutCubic');
-        
+        cam.setAttribute('animation__resetrot', 'property: rotation; to: 0 0 0; dur: ' + dur + '; easing: easeOutCubic');
+
         setTimeout(function() {
           // Reset internal state look-controls biar nggak balik ke rotasi lama
           var look = cam.components['look-controls'];
           if (look) {
             look.pitchObject.rotation.x = 0;
             look.yawObject.rotation.y = 0;
+            // Mobile magic-window yaw is an accumulated offset; pitch/roll follow the device tilt
+            look.magicWindowDeltaEuler.y = 0;
           }
           cam.setAttribute('look-controls', 'enabled: true');
-        }, 850);
+        }, dur + 50);
+      }
+
+      // --- RESET VIEW (Double Click Outside) ---
+      window.addEventListener('dblclick', function() {
+        // Cuma berlaku kalo lagi di luar dan nggak lagi transisi
+        if (is360 || isTransitioning) return;
+
+        // Animasi balik ke posisi dan rotasi awal
+        camRig.setAttribute('animation__resetpos', 'property: position; to: 0 1 5; dur: 800; easing: easeOutCubic');
+        cam.setAttribute('animation__resetcam', 'property: position; to: 0 0 0; dur: 800; easing: easeOutCubic');
+        resetCamRotation(800);
       });
 
       // --- ENTER / EXIT (Double Click on Orb) ---
@@ -254,6 +268,7 @@
 
         // Fly camera back to spawn
         camRig.setAttribute('animation__dive', 'property: position; to: 0 1 5; dur: 1000; easing: easeInOutCubic');
+        resetCamRotation(1000);
 
         // Shrink orb back
         sphere.setAttribute('animation__expand', 'property: scale; to: 1 1 1; dur: 1000; easing: easeInOutCubic');
